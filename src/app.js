@@ -7,7 +7,6 @@ require("dotenv").config();
 const cookieSession = require("cookie-session");
 
 require('./database');
-require("./auth/passportGoogle");
 
 const api = require("./api");
 const passport = require("passport");
