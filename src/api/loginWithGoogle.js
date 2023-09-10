@@ -2,10 +2,13 @@ const express = require("express");
 const { google } = require('googleapis');
 
 const router = express.Router();
+
+const REDIRECT_URI = 'http://localhost:9999/auth/google/callback';
+
 const oAuth2Client = new google.auth.OAuth2(
-    '97371485076-mchmdrk00tdip983pjaaj2vrqvhmbat6.apps.googleusercontent.com',
-    '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',
-    'http://localhost:9999/auth/google/callback'
+    process.env.OAUTH2_CLIENT_ID,
+    process.env.OAUTH2_CLIENT_SECRET,
+    REDIRECT_URI
 );
 
 router.get(
