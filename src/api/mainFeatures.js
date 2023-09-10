@@ -48,8 +48,20 @@ const chatGPTAzure = (prompt) => {
 
 }
 
-router.get("/generate/job-description", async (req, res) => {
-    const result = await chatGPTAzure('How are you today?');
+router.post("/generate/job-description", async (req, res) => {
+    const {
+        jobTitle = '',
+        skills = [],
+        extras = ''
+    } = req.body;
+
+    const prompt = `
+    Please generate a job description for a ${jobTitle}. 
+    The ideal candidate should have experience in ${skills.join()}. 
+    ${extras}.
+    Please include the job responsibilities and required qualifications.`
+
+    const result = await chatGPTAzure(prompt);
     res.send(result);
 });
 
