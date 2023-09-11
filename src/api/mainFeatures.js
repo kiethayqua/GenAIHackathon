@@ -1,5 +1,8 @@
 const express = require("express");
 const request = require("request");
+const OAuth2ClientInstance = require("../auth/OAuth2ClientInstance");
+const { google } = require('googleapis');
+const fs = require('fs');
 
 const router = express.Router();
 
@@ -63,6 +66,43 @@ router.post("/generate/job-description", async (req, res) => {
 
     const result = await chatGPTAzure(prompt);
     res.send(result);
+});
+
+router.get('/test-download-pdf', async (req, res) => {
+    const drive = google.drive({ version: 'v3', auth: OAuth2ClientInstance.instance });
+
+    drive.files.list((err, response) => {
+        if (err) {
+            console.error('Error listing files:', err);
+            res.send('Error listing files');
+        }
+        const files = response.data.files;
+        if (files.length) {
+            const pdfFileId = files.filter(file => file.mimeType == 'application/pdf')[0].id;
+            const dest = fs.createWriteStream("test.pdf");
+            drive.files.get(
+                { fileId: pdfFileId, alt: "media" },
+                { responseType: "stream" },
+                (err, { data }) => {
+                    if (err) {
+                        console.log(err);
+                        return;
+                    }
+                    data
+                        .on("end", () => console.log("Done."))
+                        .on("error", (err) => {
+                            console.log(err);
+                            return process.exit();
+                        })
+                        .pipe(dest);
+                }
+            );
+
+            res.send(`Files found:\n${files.map(file => `${file.name} (${file.id})`).join('\n')}`);
+        } else {
+            res.send('No files found.');
+        }
+    });
 });
 
 module.exports = router;
