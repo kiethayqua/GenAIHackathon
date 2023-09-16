@@ -1,6 +1,5 @@
 const express = require("express");
 const request = require("request");
-const OAuth2ClientInstance = require("../auth/OAuth2ClientInstance");
 const { google } = require("googleapis");
 const fs = require("fs");
 const { convertPdfToText } = require("../../convertPdfToText");
@@ -50,7 +49,7 @@ const chatGPTAzure = (prompt) => {
 };
 
 router.post("/generate/job-description", async (req, res) => {
-  const { jobTitle = "", skills = [], extras = "" } = req.body;
+  const { jobTitle = "", skills = [], extras = "", token = "" } = req.body;
 
   const prompt = `
     Please generate a job description for a ${jobTitle}. 
