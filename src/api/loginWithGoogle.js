@@ -15,6 +15,7 @@ const oauth2Client = new google.auth.OAuth2(
 router.get(
     "/login/google",
     (req, res) => {
+        req.headers.authorization
         const authUrl = oauth2Client.generateAuthUrl({
             access_type: 'offline',
             scope: ['https://www.googleapis.com/auth/drive']
@@ -31,6 +32,8 @@ router.get(
         console.log("CODE: " + code);
 
         res.cookie("oauth2Code", code);
+
+        // NOTE: the url of FE for action close sign in popup
         res.redirect("http://127.0.0.1:3000/login/success.html");
     }
 );

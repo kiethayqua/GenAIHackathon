@@ -3,6 +3,7 @@ const request = require("request");
 const { google } = require("googleapis");
 const fs = require("fs");
 const { convertPdfToText } = require("../../convertPdfToText");
+const { verifyAccessToken } = require("../middlewares/auth");
 
 const router = express.Router();
 
@@ -48,18 +49,27 @@ const chatGPTAzure = (prompt) => {
   });
 };
 
-router.post("/generate/job-description", async (req, res) => {
-  const { jobTitle = "", skills = [], extras = "", token = "" } = req.body;
+router.post(
+  "/generate/job-description",
+  verifyAccessToken,
+  async (req, res) => {
+    try {
+      const { jobTitle = "", skills = [], extras = "" } = req.body;
 
-  const prompt = `
-    Please generate a job description for a ${jobTitle}. 
-    The ideal candidate should have experience in ${skills.join()}. 
-    ${extras}.
-    Please include the job responsibilities and required qualifications.`;
+      const prompt = `
+      Please generate a job description for a ${jobTitle}. 
+      The ideal candidate should have experience in ${skills.join()}. 
+      ${extras}.
+      Please include the job responsibilities and required qualifications.`;
 
-  const result = await chatGPTAzure(prompt);
-  res.send(result);
-});
+      const result = await chatGPTAzure(prompt);
+      res.json({
+        data: result
+      });
+    } catch (e) {
+      res.status(500).send('Generate JD was failed!');
+    }
+  });
 
 router.post("/check-CV-for-job", async (req, res) => {
   const { jobTitle = "" } = req.body;
