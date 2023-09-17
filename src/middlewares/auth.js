@@ -1,10 +1,4 @@
-module.exports.verifyAccessToken = (req, res, next) => {
-    const authorization = req.headers.authorization;
-    const items = authorization.split(/[ ]+/);
-
-    if (items.length > 1 && items[0].trim() == "Bearer") {
-        next();
-    } else {
-        res.status(401).send("Please Login!");
-    }
+module.exports.verifyToken = (req, res, next) => {
+    if (req.body.token == null) return res.status(400).send('Token not found');
+    next();
 }

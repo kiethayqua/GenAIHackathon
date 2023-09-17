@@ -1,16 +1,9 @@
 const express = require("express");
 const User = require('../models/UserModel');
-const { google } = require('googleapis');
+const oauth2Client = require('../utils/oauth2Client');
 
 
 const router = express.Router();
-
-const REDIRECT_URI = 'http://localhost:9999/auth/google/callback';
-const oauth2Client = new google.auth.OAuth2(
-    process.env.OAUTH2_CLIENT_ID,
-    process.env.OAUTH2_CLIENT_SECRET,
-    REDIRECT_URI
-);
 
 router.get(
     "/login/google",
@@ -20,7 +13,6 @@ router.get(
             access_type: 'offline',
             scope: ['https://www.googleapis.com/auth/drive']
         });
-        console.log(authUrl);
         res.redirect(authUrl);
     }
 );
