@@ -4,7 +4,9 @@ const { google } = require("googleapis");
 const fs = require("fs");
 const { convertPdfToText } = require("../../convertPdfToText");
 const { verifyToken } = require("../middlewares/auth");
-const oauth2Client = require('../utils/oauth2Client');
+const { getOAuth2Client } = require('../utils/oauth2Client');
+const User = require('../models/UserModel');
+const JobDescription = require('../models/JobDescriptionModel');
 
 const router = express.Router();
 
@@ -64,6 +66,17 @@ router.post(
       Please include the job responsibilities and required qualifications.`;
 
       const result = await chatGPTAzure(prompt);
+      const oauth2Client = getOAuth2Client();
+      oauth2Client.setCredentials(req.body.token);
+      const drive = google.drive({ version: 'v3', auth: oauth2Client });
+      const googleUser = (await drive.about.get({ fields: 'user' })).data.user;
+      const user = await User.findOne({ id: googleUser.permissionId });
+      await JobDescription.create({
+        jobTitle,
+        data: result,
+        createdBy: user
+      });
+
       res.json({
         data: result
       });
@@ -92,7 +105,7 @@ router.post(
   verifyToken,
   async (req, res) => {
     try {
-      console.log(JSON.stringify(req.body.token));
+      const oauth2Client = getOAuth2Client();
       oauth2Client.setCredentials(req.body.token);
       const drive = google.drive({
         version: "v3",

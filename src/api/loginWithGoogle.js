@@ -1,6 +1,7 @@
 const express = require("express");
 const User = require('../models/UserModel');
-const oauth2Client = require('../utils/oauth2Client');
+const { getOAuth2Client } = require('../utils/oauth2Client');
+const { google } = require("googleapis");
 
 
 const router = express.Router();
@@ -9,7 +10,7 @@ router.get(
     "/login/google",
     (req, res) => {
         req.headers.authorization
-        const authUrl = oauth2Client.generateAuthUrl({
+        const authUrl = getOAuth2Client().generateAuthUrl({
             access_type: 'offline',
             scope: ['https://www.googleapis.com/auth/drive']
         });
@@ -34,10 +35,24 @@ router.post(
     "/auth/me",
     async (req, res) => {
         if (req.body.code == null) return res.status(400).send('Invalid Request');
+        const oauth2Client = getOAuth2Client();
         oauth2Client.getToken(req.body.code, async (err, token) => {
             if (err) {
                 console.error('Error retrieving access token', err);
                 return res.status(400).send('Error retrieving access token');
+            }
+            oauth2Client.setCredentials(token);
+            const drive = google.drive({ version: 'v3', auth: oauth2Client });
+            const googleUser = (await drive.about.get({ fields: 'user' })).data.user;
+            const defaultUser = {
+                id: googleUser.permissionId,
+                email: googleUser.emailAddress,
+                avatar: googleUser.photoLink,
+                name: googleUser.displayName
+            }
+            const user = await User.findOne({ id: googleUser.permissionId });
+            if (!user) {
+                await User.create(defaultUser);
             }
 
             res.send(token);

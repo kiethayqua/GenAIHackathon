@@ -5,9 +5,9 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 require("dotenv").config();
 
-// const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 
-// mongoose.connect(process.env.MONGODB_URI);
+mongoose.connect(process.env.MONGODB_URI);
 
 const api = require("./api");
 
