@@ -55,7 +55,10 @@ router.post(
                 await User.create(defaultUser);
             }
 
-            res.send(token);
+            res.json({
+                token: token,
+                user: defaultUser
+            });
         });
     }
 )

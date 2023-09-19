@@ -244,4 +244,35 @@ router.get("/check-cv-prompt", async (req, res) => {
   });
 });
 
+router.get(
+  '/generate-interview-questions',
+  async (req, res) => {
+    const jdId = req.query.jd;
+    const jd = await JobDescription.findById(jdId);
+    if (jd) {
+      const prompt = `As a recruiter, my objective is to design a comprehensive set of interview questions that effectively illuminate the interviewees' proficiency with this job description:
+      ${jd.data}.
+      Can you assist me in creating an interview protocol with 10 multiple choices questions about the Responsibilities in job description and the expectation answer?`;
+      const stringData = await chatGPTAzure(prompt);
+
+      const prompt1 = `Please help me to convert this string: ${stringData} to the JSON string with structure:
+      {
+        "data": [
+          {
+            "question": // a string question,
+            "options": // an array string,
+            "correct_answer": // the index of correct answer
+          }
+        ]
+      }
+      `;
+      const jsonData = await chatGPTAzure(prompt1);
+
+      res.json(jsonData);
+    } else {
+      res.json({});
+    }
+  }
+)
+
 module.exports = router;
