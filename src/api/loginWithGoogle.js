@@ -27,7 +27,7 @@ router.get(
         res.cookie("oauth2Code", code);
 
         // NOTE: the url of FE for action close sign in popup
-        res.redirect("http://127.0.0.1:3000/login/success.html");
+        res.redirect("http://127.0.0.1:3010/redirect");
     }
 );
 

@@ -249,7 +249,6 @@ router.get("/check-cv-prompt", async (req, res) => {
 router.get(
   '/generate-interview-questions',
   async (req, res) => {
-    console.log(req.query);
     const jdId = req.query.jd;
     const jd = await JobDescription.findById(jdId);
     if (jd) {
@@ -258,7 +257,7 @@ router.get(
       Can you assist me in creating an interview protocol with 10 multiple choices questions about the Responsibilities in job description and the expectation answer?`;
       const stringData = await chatGPTAzure(prompt);
 
-      const prompt1 = `Please help me to convert this string: ${stringData} to the JSON string with structure:
+      const prompt1 = `Return this string: ${stringData} as a JSON like this: 
       {
         "data": [
           {
@@ -267,9 +266,17 @@ router.get(
             "correct_answer": // the index of correct answer
           }
         ]
+      }`;
+      const data = await chatGPTAzure(prompt1) || "";
+      const firstIndexOfBracket = data.indexOf("{");
+      let lastIndexOfBracket = -1;
+      for (let i = (data?.length || 0) - 1; i >= 0; i--) {
+        if (data?.[i] === "}") {
+          lastIndexOfBracket = i;
+          break;
+        }
       }
-      `;
-      const jsonData = await chatGPTAzure(prompt1);
+      const jsonData = data.substring(firstIndexOfBracket, lastIndexOfBracket + 1)
 
       res.json(jsonData);
     } else {
