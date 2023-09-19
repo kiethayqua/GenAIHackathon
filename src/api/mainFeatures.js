@@ -74,14 +74,16 @@ router.post(
       await JobDescription.create({
         jobTitle,
         data: result,
-        createdBy: user
+        createdBy: user,
+        status: true,
+        isDeleted: false
       });
 
       res.json({
         data: result
       });
     } catch (e) {
-      res.status(500).send('Generate JD was failed!');
+      res.status(500).send('Generate JD was failed!' + e);
     }
   });
 
@@ -247,6 +249,7 @@ router.get("/check-cv-prompt", async (req, res) => {
 router.get(
   '/generate-interview-questions',
   async (req, res) => {
+    console.log(req.query);
     const jdId = req.query.jd;
     const jd = await JobDescription.findById(jdId);
     if (jd) {
@@ -274,5 +277,53 @@ router.get(
     }
   }
 )
+
+router.post(
+  '/list/job-descriptions',
+  verifyToken,
+  async (req, res) => {
+    const { id = null, status = null, token } = req.body;
+    console.log(status)
+
+    const oauth2Client = getOAuth2Client();
+    oauth2Client.setCredentials(token);
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+    const googleUser = (await drive.about.get({ fields: 'user' })).data.user;
+    const user = await User.findOne({ id: googleUser.permissionId });
+
+    const jds = await JobDescription.find({
+      createdBy: user,
+      isDeleted: false,
+      ...((typeof status == "boolean") ? { status } : {}),
+      ...(id ? { id } : {})
+    });
+
+    res.json({
+      data: jds || []
+    });
+  }
+);
+
+router.post(
+  '/update/job-description',
+  verifyToken,
+  async (req, res) => {
+    const { status = null, isDeleted = null, id } = req.body;
+
+    const jd = await JobDescription.findById(id);
+    if (!jd) {
+      res.json({ message: 'Not existed!' });
+    } else {
+      if (typeof status == 'boolean') {
+        jd.status = status;
+      }
+      if (typeof isDeleted == 'boolean') {
+        jd.isDeleted = isDeleted;
+      }
+      await jd.save();
+      res.json({ message: 'Success' });
+    }
+  }
+);
 
 module.exports = router;
