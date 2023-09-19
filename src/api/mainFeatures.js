@@ -308,7 +308,13 @@ router.post(
   '/update/job-description',
   verifyToken,
   async (req, res) => {
-    const { status = null, isDeleted = null, id } = req.body;
+    const {
+      id,
+      status = null,
+      isDeleted = null,
+      data = null,
+      jobTitle = null
+    } = req.body;
 
     const jd = await JobDescription.findById(id);
     if (!jd) {
@@ -319,6 +325,12 @@ router.post(
       }
       if (typeof isDeleted == 'boolean') {
         jd.isDeleted = isDeleted;
+      }
+      if (!!data) {
+        jd.data = data;
+      }
+      if (!!jobTitle) {
+        jd.jobTitle = jobTitle;
       }
       await jd.save();
       res.json({ message: 'Success' });
