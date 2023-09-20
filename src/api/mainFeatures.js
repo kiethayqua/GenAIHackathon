@@ -64,41 +64,72 @@ router.post('/generate/job-description', verifyToken, async (req, res) => {
       ${extras}.
       Please include the job responsibilities and required qualifications.`
 
-      const result = await chatGPTAzure(prompt);
-      const oauth2Client = getOAuth2Client();
-      oauth2Client.setCredentials(req.body.token);
-      const drive = google.drive({ version: 'v3', auth: oauth2Client });
-      const googleUser = (await drive.about.get({ fields: 'user' })).data.user;
-      const user = await User.findOne({ id: googleUser.permissionId });
-      await JobDescription.create({
-        jobTitle,
-        data: result,
-        createdBy: user,
-        status: true,
-        isDeleted: false
-      });
+    const result = await chatGPTAzure(prompt)
+    const oauth2Client = getOAuth2Client()
+    oauth2Client.setCredentials(req.body.token)
+    const drive = google.drive({ version: 'v3', auth: oauth2Client })
+    const googleUser = (await drive.about.get({ fields: 'user' })).data.user
+    const user = await User.findOne({ id: googleUser.permissionId })
+    await JobDescription.create({
+      jobTitle,
+      data: result,
+      createdBy: user,
+      status: true,
+      isDeleted: false,
+    })
 
-      res.json({
-        data: result
-      });
-    } catch (e) {
-      res.status(500).send('Generate JD was failed!' + e);
-    }
-  });
+    res.json({
+      data: result,
+    })
+  } catch (e) {
+    res.status(500).send('Generate JD was failed!' + e)
+  }
+})
 
 router.post('/check-CV-for-job', async (req, res) => {
-  const { jobTitle = '' } = req.body
-  console.log('jobTitle', jobTitle)
-  const cvPrompt = await loadCVPrompt()
-  console.log('cvPrompt', cvPrompt)
+  const oauth2Client = getOAuth2Client()
+  oauth2Client.setCredentials(req.body.token)
+  const drive = google.drive({
+    version: 'v3',
+    auth: oauth2Client,
+  })
+  async function listFolders(folderId) {
+    const response = await drive.files.list({
+      q: `'${folderId}' in parents and mimeType='application/vnd.google-apps.folder'`,
+    })
 
-  const prompt = `
-      I have a job with description: ${jobTitle}. 
-      The candidate CV: ${cvPrompt}. 
-      Check is this CV suitable for this job? Why?`
+    const folders = response.data.files
+    const folderIds = folders.map((folder) => folder.id)
 
-  const result = await chatGPTAzure(prompt)
-  res.send(result)
+    for (const folder of folders) {
+      folderIds.push(...(await listFolders(folder.id)))
+    }
+
+    return folderIds
+  }
+
+  const allFolderIds = await listFolders('root')
+  allFolderIds.forEach(async (folderId) => {
+    const response = await drive.files.list({
+      q: `'${folderId}' in parents`,
+    })
+
+    console.log('hehehe file ', response.data.files)
+  })
+  console.log('hehehe allFolderIds ', allFolderIds)
+
+  // const { jobTitle = '' } = req.body
+  // console.log('jobTitle', jobTitle)
+  // const cvPrompt = await loadCVPrompt()
+  // console.log('cvPrompt', cvPrompt)
+
+  // const prompt = `
+  //     I have a job with description: ${jobTitle}.
+  //     The candidate CV: ${cvPrompt}.
+  //     Check is this CV suitable for this job? Why?`
+
+  // const result = await chatGPTAzure(prompt)
+  res.send('OK')
 })
 
 router.post('/test-download-pdf', verifyToken, async (req, res) => {
@@ -307,52 +338,44 @@ router.get('/generate-interview-questions', async (req, res) => {
   }
 })
 
-router.post(
-  '/list/job-descriptions',
-  verifyToken,
-  async (req, res) => {
-    const { id = null, status = null, token } = req.body;
-    console.log(status)
+router.post('/list/job-descriptions', verifyToken, async (req, res) => {
+  const { id = null, status = null, token } = req.body
+  console.log(status)
 
-    const oauth2Client = getOAuth2Client();
-    oauth2Client.setCredentials(token);
-    const drive = google.drive({ version: 'v3', auth: oauth2Client });
-    const googleUser = (await drive.about.get({ fields: 'user' })).data.user;
-    const user = await User.findOne({ id: googleUser.permissionId });
+  const oauth2Client = getOAuth2Client()
+  oauth2Client.setCredentials(token)
+  const drive = google.drive({ version: 'v3', auth: oauth2Client })
+  const googleUser = (await drive.about.get({ fields: 'user' })).data.user
+  const user = await User.findOne({ id: googleUser.permissionId })
 
-    const jds = await JobDescription.find({
-      createdBy: user,
-      isDeleted: false,
-      ...((typeof status == "boolean") ? { status } : {}),
-      ...(id ? { id } : {})
-    });
+  const jds = await JobDescription.find({
+    createdBy: user,
+    isDeleted: false,
+    ...(typeof status == 'boolean' ? { status } : {}),
+    ...(id ? { id } : {}),
+  })
 
-    res.json({
-      data: jds || []
-    });
-  }
-);
+  res.json({
+    data: jds || [],
+  })
+})
 
-router.post(
-  '/update/job-description',
-  verifyToken,
-  async (req, res) => {
-    const { status = null, isDeleted = null, id } = req.body;
+router.post('/update/job-description', verifyToken, async (req, res) => {
+  const { status = null, isDeleted = null, id } = req.body
 
-    const jd = await JobDescription.findById(id);
-    if (!jd) {
-      res.json({ message: 'Not existed!' });
-    } else {
-      if (typeof status == 'boolean') {
-        jd.status = status;
-      }
-      if (typeof isDeleted == 'boolean') {
-        jd.isDeleted = isDeleted;
-      }
-      await jd.save();
-      res.json({ message: 'Success' });
+  const jd = await JobDescription.findById(id)
+  if (!jd) {
+    res.json({ message: 'Not existed!' })
+  } else {
+    if (typeof status == 'boolean') {
+      jd.status = status
     }
+    if (typeof isDeleted == 'boolean') {
+      jd.isDeleted = isDeleted
+    }
+    await jd.save()
+    res.json({ message: 'Success' })
   }
-);
+})
 
-module.exports = router;
+module.exports = router
