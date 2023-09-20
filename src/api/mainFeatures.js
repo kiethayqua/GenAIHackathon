@@ -13,7 +13,7 @@ const router = express.Router();
 const azure = {
   apiKey: process.env.AZURE_API_KEY,
   version: "2023-05-15",
-  resourceName: "momo-genai-17",
+  resourceName: "momo-genai-17-3",
   gpt35: "gpt-35",
   gpt4: "gpt-4",
 };
