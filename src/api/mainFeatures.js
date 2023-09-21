@@ -85,23 +85,24 @@ router.post('/check-CV-for-job', async (req, res) => {
     version: 'v3',
     auth: oauth2Client,
   })
-  async function listFolders(folderId) {
+  async function listFolders({ folderId, path }) {
     const response = await drive.files.list({
       q: `'${folderId}' in parents and mimeType='application/vnd.google-apps.folder'`,
     })
 
     const folders = response.data.files
-    const folderIds = folders.map((folder) => folder.id)
+    const folderIds = folders.map((folder) => ({folderId: folder.id, path: path + '/' + folder.name }))
 
     for (const folder of folders) {
-      folderIds.push(...(await listFolders(folder.id)))
+      folderIds.push(...(await listFolders({ folderId: folder.id, path: path + '/' + folder.name })))
     }
 
     return folderIds
   }
+  console.log('hehehe ', )
 
-  const allFolderIds = await listFolders('root')
-  allFolderIds.forEach(async (folderId) => {
+  const allFolderIds = await listFolders({ folderId: 'root', path: '' })
+  allFolderIds.forEach(async ({folderId}) => {
     const response = await drive.files.list({
       q: `'${folderId}' in parents`,
     })
