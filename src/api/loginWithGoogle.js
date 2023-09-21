@@ -27,7 +27,7 @@ router.get(
         res.cookie("oauth2Code", code);
 
         // NOTE: the url of FE for action close sign in popup
-        res.redirect("http://127.0.0.1:3010/redirect");
+        res.redirect("http://localhost:3010/redirect");
     }
 );
 
@@ -41,6 +41,7 @@ router.post(
                 console.error('Error retrieving access token', err);
                 return res.status(400).send('Error retrieving access token');
             }
+            console.log('tokennnn ', JSON.stringify(token))
             oauth2Client.setCredentials(token);
             const drive = google.drive({ version: 'v3', auth: oauth2Client });
             const googleUser = (await drive.about.get({ fields: 'user' })).data.user;
