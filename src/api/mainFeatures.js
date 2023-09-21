@@ -187,8 +187,9 @@ router.post(
       const googleUser = (await drive.about.get({ fields: 'user' })).data.user;
       const user = await User.find({ id: googleUser.permissionId });
       const jobDescriptions = await JobDescription.find({ createdBy: user, isDeleted: false, status: true });
-      const results = await Promise.all(
-        jobDescriptions.map(async (jd) => {
+      const results = []
+      while (jobDescriptions.length > 0) {
+        results.push(...await Promise.all(jobDescriptions.splice(0, 5).map(async (jd) => {
           const { id, jobTitle, data } = jd
           const prompt = `
               I have a job with description: ${data} and title: ${jobTitle}.
@@ -197,8 +198,8 @@ router.post(
 
           const result = await chatGPTAzure(prompt)
           return { id, jobTitle, percent: getNumberResult(result) }
-        })
-      );
+        })))
+      }
 
       //remove file after used
       fs.unlinkSync(req.file.path);
@@ -265,12 +266,17 @@ router.post(
       const googleUser = (await drive.about.get({ fields: 'user' })).data.user;
       const user = await User.findOne({ id: googleUser.permissionId });
 
-      const jds = await JobDescription.find({
-        createdBy: user,
-        isDeleted: false,
-        ...((typeof status == "boolean") ? { status } : {}),
-        ...(id ? { id } : {})
-      });
+      let jds = [];
+
+      if (id) {
+        jds = [await JobDescription.findById(id)];
+      } else {
+        jds = await JobDescription.find({
+          createdBy: user,
+          isDeleted: false,
+          ...((typeof status == "boolean") ? { status } : {}),
+        });
+      }
 
       res.json({
         data: jds || []
