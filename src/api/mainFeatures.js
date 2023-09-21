@@ -2,12 +2,13 @@ const express = require('express')
 const request = require('request')
 const { google } = require('googleapis')
 const fs = require('fs')
-const { convertPdfToText } = require('../../convertPdfToText')
 const { verifyToken } = require('../middlewares/auth')
 const { getOAuth2Client } = require('../utils/oauth2Client')
 const User = require('../models/UserModel')
 const JobDescription = require('../models/JobDescriptionModel')
 const multer = require('multer')
+const { file } = require('googleapis/build/src/apis/file')
+const { convertPdfToText } = require('../utils')
 const upload = multer({ dest: 'uploads/' })
 
 const router = express.Router()
@@ -90,7 +91,7 @@ router.post(
     });
 
     const listData = await drive.files.list({
-      q: `root in parents and mimeType='application/vnd.google-apps.folder'`,
+      q: `'root' in parents and mimeType='application/vnd.google-apps.folder'`,
     });
     const folders = listData.data.files?.map(file => ({
       id: file.id,
@@ -101,36 +102,52 @@ router.post(
   }
 );
 
-router.post('/check-CV-for-job', async (req, res) => {
-  const oauth2Client = getOAuth2Client();
-  oauth2Client.setCredentials(req.body.token);
-  const drive = google.drive({
-    version: 'v3',
-    auth: oauth2Client,
+router.post(
+  '/find-cvs-for-job',
+  verifyToken,
+  async (req, res) => {
+    const oauth2Client = getOAuth2Client();
+    oauth2Client.setCredentials(req.body.token);
+    const drive = google.drive({
+      version: 'v3',
+      auth: oauth2Client,
+    });
+    let { folderId, jdId, top } = req.body;
+    top = Number(top) || 3;
+    const jd = await JobDescription.findById(jdId);
+    if (jd) {
+      const response = await drive.files.list({
+        q: `'${folderId}' in parents`,
+      });
+      const files = response.data.files;
+      if (files.length) {
+        const pdfFiles = files.filter(
+          (file) => file.mimeType == 'application/pdf'
+        );
+
+        const results = await Promise.all(pdfFiles.map(async file => {
+          const dataBuffer = await drive.files.get({ fileId: file.id, alt: 'media' }, { responseType: 'arraybuffer' });
+          const text = await convertPdfToText(dataBuffer);
+          const prompt = `
+          I have a job with description: ${jd.data}.
+          The candidate CV: ${text}.
+          Please, help me to calculate matching between the CV and JD, the result in percent, just give me only the result's number`
+
+          const result = await chatGPTAzure(prompt);
+          return {
+            url: `https://drive.google.com/file/d/${file.id}/view`,
+            percent: Number(result.replace('%', '')) || 0
+          };
+        }));
+
+        res.json({ data: results.sort((a, b) => b.percent - a.percent).filter((rs) => rs.percent !== 0).slice(0, top) });
+      } else {
+        res.json({ data: [] });
+      }
+    } else {
+      res.json({ data: [] });
+    }
   })
-
-  allFolderIds.forEach(async ({ folderId }) => {
-    const response = await drive.files.list({
-      q: `'${folderId}' in parents`,
-    })
-
-    console.log('hehehe file ', response.data.files)
-  })
-  console.log('hehehe allFolderIds ', allFolderIds)
-
-  // const { jobTitle = '' } = req.body
-  // console.log('jobTitle', jobTitle)
-  // const cvPrompt = await loadCVPrompt()
-  // console.log('cvPrompt', cvPrompt)
-
-  // const prompt = `
-  //     I have a job with description: ${jobTitle}.
-  //     The candidate CV: ${cvPrompt}.
-  //     Check is this CV suitable for this job? Why?`
-
-  // const result = await chatGPTAzure(prompt)
-  res.send('OK')
-})
 
 router.get('/check-cv-prompt', async (req, res) => {
   const drive = google.drive({
