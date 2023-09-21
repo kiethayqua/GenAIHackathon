@@ -56,31 +56,23 @@ const chatGPTAzure = (prompt) => {
 
 router.post('/generate/job-description', verifyToken, async (req, res) => {
   try {
-    const { jobTitle = '', skills = [], extras = '' } = req.body
+    const { jobTitle = '', skills = [], extras = '' } = req.body;
 
     const prompt = `
       Please generate a job description for a ${jobTitle}. 
       The ideal candidate should have experience in ${skills.join()}. 
       ${extras}.
-      Please include the job responsibilities and required qualifications.`
+      Please include the job responsibilities and required qualifications.`;
 
-    const result = await chatGPTAzure(prompt)
-    const oauth2Client = getOAuth2Client()
-    oauth2Client.setCredentials(req.body.token)
-    const drive = google.drive({ version: 'v3', auth: oauth2Client })
-    const googleUser = (await drive.about.get({ fields: 'user' })).data.user
-    const user = await User.findOne({ id: googleUser.permissionId })
-    await JobDescription.create({
-      jobTitle,
-      data: result,
-      createdBy: user,
-      status: true,
-      isDeleted: false,
-    })
+    const result = await chatGPTAzure(prompt);
+    const oauth2Client = getOAuth2Client();
+    oauth2Client.setCredentials(req.body.token);
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+    const googleUser = (await drive.about.get({ fields: 'user' })).data.user;
+    const user = await User.findOne({ id: googleUser.permissionId });
+    await JobDescription.create({ jobTitle, data: result, createdBy: user, status: true, isDeleted: false });
 
-    res.json({
-      data: result,
-    })
+    res.json({ data: result })
   } catch (e) {
     res.status(500).send('Generate JD was failed!' + e)
   }
@@ -273,24 +265,22 @@ router.get('/check-cv-prompt', async (req, res) => {
 
 router.post(
   '/find-jobs-for-cv',
-  // verifyToken,
   upload.single('file'),
   async (req, res) => {
     try {
       const data = fs.readFileSync(req.file.path)
       const cvText = await convertPdfToText(data)
-      console.log(cvText)
-      // const oauth2Client = getOAuth2Client()
-      // oauth2Client.setCredentials(req.body.token)
-      // const drive = google.drive({
-      //   version: 'v3',
-      //   auth: oauth2Client,
-      // })
-      const jobDescriptions = [
-        { data: 'Senior java developer', jobTitle: 'Senior java developer' },
-        { data: 'React native developer', jobTitle: 'React native developer' },
-      ]
-      // const jobDescriptions = await JobDescription.find().exec()
+      const oauth2Client = getOAuth2Client()
+      let token = req.body.token;
+      token = typeof token == 'string' ? JSON.parse(token) : token;
+      oauth2Client.setCredentials(token);
+      const drive = google.drive({
+        version: 'v3',
+        auth: oauth2Client,
+      });
+      const googleUser = (await drive.about.get({ fields: 'user' })).data.user;
+      const user = await User.find({ id: googleUser.permissionId });
+      const jobDescriptions = await JobDescription.find({ createdBy: user, isDeleted: false, status: true });
       const results = await Promise.all(
         jobDescriptions.map(async (jd) => {
           const prompt = `
@@ -301,12 +291,14 @@ router.post(
           const result = await chatGPTAzure(prompt)
           return Number(result.replace('%', '')) || 0
         })
-      )
+      );
 
       //remove file after used
-      fs.unlink(req.file.path)
+      fs.unlinkSync(req.file.path);
       res.send(`OK ${results.sort((a, b) => b - a).filter((rs) => rs !== 0)}`)
-    } catch (e) {}
+    } catch (e) {
+      console.log(e);
+    }
   }
 )
 
@@ -329,55 +321,20 @@ router.get('/generate-interview-questions', async (req, res) => {
           }
         ]
       }`;
-      const data = await chatGPTAzure(prompt1) || "";
-      const firstIndexOfBracket = data.indexOf("{");
-      let lastIndexOfBracket = -1;
-      for (let i = (data?.length || 0) - 1; i >= 0; i--) {
-        if (data?.[i] === "}") {
-          lastIndexOfBracket = i;
-          break;
-        }
+    const data = await chatGPTAzure(prompt1) || "";
+    const firstIndexOfBracket = data.indexOf("{");
+    let lastIndexOfBracket = -1;
+    for (let i = (data?.length || 0) - 1; i >= 0; i--) {
+      if (data?.[i] === "}") {
+        lastIndexOfBracket = i;
+        break;
       }
-      const jsonData = data.substring(firstIndexOfBracket, lastIndexOfBracket + 1)
+    }
+    const jsonData = data.substring(firstIndexOfBracket, lastIndexOfBracket + 1)
 
     res.json(jsonData)
   } else {
     res.json({})
-  }
-})
-
-router.post('/list/job-descriptions', verifyToken, async (req, res) => {
-  const { id = null, status = null, token } = req.body
-  console.log(status)
-
-  const oauth2Client = getOAuth2Client()
-  oauth2Client.setCredentials(token)
-  const drive = google.drive({ version: 'v3', auth: oauth2Client })
-  const googleUser = (await drive.about.get({ fields: 'user' })).data.user
-  const user = await User.findOne({ id: googleUser.permissionId })
-
-  const jds = await JobDescription.find({
-    createdBy: user,
-    isDeleted: false,
-    ...(typeof status == 'boolean' ? { status } : {}),
-    ...(id ? { id } : {}),
-  })
-
-  res.json({
-    data: jds || [],
-  })
-})
-
-router.post('/update/job-description', verifyToken, async (req, res) => {
-  const { status = null, isDeleted = null, id } = req.body
-
-  const jd = await JobDescription.findById(id)
-  if (!jd) {
-    res.json({ message: 'Not existed!' })
-  } else {
-    if (typeof status == 'boolean') {
-      jd.status = status
-    }
   }
 })
 
