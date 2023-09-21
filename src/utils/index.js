@@ -9,5 +9,9 @@ module.exports = {
         } catch (error) {
             return "";
         }
+    },
+    getNumberResult: (string) => {
+        const numberPattern = /\d+/g;
+        return Number(string.match(numberPattern)?.[0] || 0);
     }
 }

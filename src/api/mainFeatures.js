@@ -8,7 +8,7 @@ const User = require('../models/UserModel')
 const JobDescription = require('../models/JobDescriptionModel')
 const multer = require('multer')
 const { file } = require('googleapis/build/src/apis/file')
-const { convertPdfToText } = require('../utils')
+const { convertPdfToText, getNumberResult } = require('../utils')
 const upload = multer({ dest: 'uploads/' })
 
 const router = express.Router()
@@ -136,7 +136,7 @@ router.post(
           const result = await chatGPTAzure(prompt);
           return {
             url: `https://drive.google.com/file/d/${file.id}/view`,
-            percent: Number(result.replace('%', '')) || 0
+            percent: getNumberResult(result)
           };
         }));
 
@@ -230,7 +230,7 @@ router.post(
               Please, help me to calculate matching between the CV and JD, the result in percent, just give me only the result's number`
 
           const result = await chatGPTAzure(prompt)
-          return { id, jobTitle, percent: Number(result.replace('%', '')) || 0 }
+          return { id, jobTitle, percent: getNumberResult(result) }
         })
       );
 
