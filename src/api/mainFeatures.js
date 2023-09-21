@@ -272,6 +272,7 @@ router.post(
       const cvText = await convertPdfToText(data)
       const oauth2Client = getOAuth2Client()
       let token = req.body.token;
+      const top = Number(req.body.top) || 3;
       token = typeof token == 'string' ? JSON.parse(token) : token;
       oauth2Client.setCredentials(token);
       const drive = google.drive({
@@ -296,7 +297,7 @@ router.post(
 
       //remove file after used
       fs.unlinkSync(req.file.path);
-      res.json(results.sort((a, b) => b.percent - a.percent).filter((rs) => rs.percent !== 0))
+      res.json(results.sort((a, b) => b.percent - a.percent).filter((rs) => rs.percent !== 0).slice(0, top));
     } catch (e) {
       console.log(e);
     }
