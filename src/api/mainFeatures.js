@@ -283,19 +283,20 @@ router.post(
       const jobDescriptions = await JobDescription.find({ createdBy: user, isDeleted: false, status: true });
       const results = await Promise.all(
         jobDescriptions.map(async (jd) => {
+          const { id, jobTitle, data } = jd
           const prompt = `
-              I have a job with description: ${jd.data} and title: ${jd.jobTitle}.
+              I have a job with description: ${data} and title: ${jobTitle}.
               The candidate CV: ${cvText}.
               Please, help me to calculate matching between the CV and JD, the result in percent, just give me only the result's number`
 
           const result = await chatGPTAzure(prompt)
-          return Number(result.replace('%', '')) || 0
+          return { id, jobTitle, percent: Number(result.replace('%', '')) || 0 }
         })
       );
 
       //remove file after used
       fs.unlinkSync(req.file.path);
-      res.send(`OK ${results.sort((a, b) => b - a).filter((rs) => rs !== 0)}`)
+      res.json(results.sort((a, b) => b.percent - a.percent).filter((rs) => rs.percent !== 0))
     } catch (e) {
       console.log(e);
     }
