@@ -131,26 +131,29 @@ router.post(
           const pdfFiles = files.filter(
             (file) => file.mimeType == 'application/pdf'
           );
+          console.log(pdfFiles.length);
+          let results = []
+          while (pdfFiles.length > 0) {
+            results.push(...await Promise.all(pdfFiles.splice(0, 5).map(async file => {
+              const dataBuffer = await drive.files.get({ fileId: file.id, alt: 'media' }, { responseType: 'arraybuffer' });
+              const text = await convertPdfToText(dataBuffer);
+              const prompt = `
+              I have a job with description:
+              ${jd.data.trim()}
+  
+              And the candidate CV:
+              ${text.trim()}
+  
+              Please, help me to calculate matching between the candidate's main skills in the CV and the Responsibilities in the JD, the result in percent, just give me only the result's number`;
 
-          const results = await Promise.all(pdfFiles.map(async file => {
-            const dataBuffer = await drive.files.get({ fileId: file.id, alt: 'media' }, { responseType: 'arraybuffer' });
-            const text = await convertPdfToText(dataBuffer);
-            const prompt = `
-            I have a job with description:
-            ${jd.data.trim()}
-
-            And the candidate CV:
-            ${text.trim()}
-
-            Please, help me to calculate matching between the CV and JD, the result in percent, just give me only the result's number`;
-
-            const result = await chatGPTAzure(prompt);
-            return {
-              url: `https://drive.google.com/file/d/${file.id}/view`,
-              percent: getNumberResult(result)
-            };
-          }));
-
+              const result = await chatGPTAzure(prompt);
+              return {
+                url: `https://drive.google.com/file/d/${file.id}/view`,
+                percent: getNumberResult(result)
+              };
+            })));
+          }
+          console.log('results ', results.length)
           res.json({ data: results.sort((a, b) => b.percent - a.percent).filter((rs) => rs.percent !== 0).slice(0, top) });
         } else {
           res.json({ data: [] });
