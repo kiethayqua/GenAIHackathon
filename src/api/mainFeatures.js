@@ -78,31 +78,38 @@ router.post('/generate/job-description', verifyToken, async (req, res) => {
   }
 })
 
+router.post(
+  '/list/drive-folders',
+  verifyToken,
+  async (req, res) => {
+    const oauth2Client = getOAuth2Client();
+    oauth2Client.setCredentials(req.body.token);
+    const drive = google.drive({
+      version: 'v3',
+      auth: oauth2Client,
+    });
+
+    const listData = await drive.files.list({
+      q: `root in parents and mimeType='application/vnd.google-apps.folder'`,
+    });
+    const folders = listData.data.files?.map(file => ({
+      id: file.id,
+      folderName: file.name
+    })) || [];
+
+    res.json({ data: folders });
+  }
+);
+
 router.post('/check-CV-for-job', async (req, res) => {
-  const oauth2Client = getOAuth2Client()
-  oauth2Client.setCredentials(req.body.token)
+  const oauth2Client = getOAuth2Client();
+  oauth2Client.setCredentials(req.body.token);
   const drive = google.drive({
     version: 'v3',
     auth: oauth2Client,
   })
-  async function listFolders({ folderId, path }) {
-    const response = await drive.files.list({
-      q: `'${folderId}' in parents and mimeType='application/vnd.google-apps.folder'`,
-    })
 
-    const folders = response.data.files
-    const folderIds = folders.map((folder) => ({folderId: folder.id, path: path + '/' + folder.name }))
-
-    for (const folder of folders) {
-      folderIds.push(...(await listFolders({ folderId: folder.id, path: path + '/' + folder.name })))
-    }
-
-    return folderIds
-  }
-  console.log('hehehe ', )
-
-  const allFolderIds = await listFolders({ folderId: 'root', path: '' })
-  allFolderIds.forEach(async ({folderId}) => {
+  allFolderIds.forEach(async ({ folderId }) => {
     const response = await drive.files.list({
       q: `'${folderId}' in parents`,
     })
@@ -124,92 +131,6 @@ router.post('/check-CV-for-job', async (req, res) => {
   // const result = await chatGPTAzure(prompt)
   res.send('OK')
 })
-
-router.post('/test-download-pdf', verifyToken, async (req, res) => {
-  try {
-    const oauth2Client = getOAuth2Client()
-    oauth2Client.setCredentials(req.body.token)
-    const drive = google.drive({
-      version: 'v3',
-      auth: oauth2Client,
-    })
-
-    drive.files.list((err, response) => {
-      if (err) {
-        console.error('Error listing files:', err)
-        res.send('Error listing files')
-      }
-      const files = response.data.files
-      if (files.length) {
-        const pdfFileId = files.filter(
-          (file) => file.mimeType == 'application/pdf'
-        )[0].id
-        const dest = fs.createWriteStream('test.pdf')
-        drive.files.get(
-          { fileId: pdfFileId, alt: 'media' },
-          { responseType: 'stream' },
-          (err, { data }) => {
-            if (err) {
-              console.log(err)
-              return
-            }
-            data
-              .on('end', () => console.log('Done.'))
-              .on('error', (err) => {
-                console.log(err)
-                return process.exit()
-              })
-              .pipe(dest)
-          }
-        )
-
-        res.json({
-          message: `Files found:\n${files
-            .map((file) => `${file.name} (${file.id})`)
-            .join('\n')}`,
-        })
-      } else {
-        res.json({ message: 'No files found.' })
-      }
-    })
-  } catch (e) {
-    res.status(500).send('Fail to download pdf!')
-  }
-})
-
-const loadCVPrompt = () => {
-  const drive = google.drive({
-    version: 'v3',
-    auth: OAuth2ClientInstance.instance,
-  })
-
-  return new Promise((resolve, reject) => {
-    drive.files.list((err, response) => {
-      const files = response.data.files
-      if (files.length) {
-        const pdfFileId = files.filter(
-          (file) => file.mimeType == 'application/pdf'
-        )[0].id
-        //   const dest = fs.createWriteStream("test.pdf");
-
-        drive.files.get(
-          { fileId: pdfFileId, alt: 'media' },
-          { responseType: 'arraybuffer' },
-          async (err, { data }) => {
-            if (err) {
-              console.log(err)
-              resolve('')
-            }
-            const buffer = Buffer.from(data)
-            const cvPrompt = await convertPdfToText(buffer)
-            resolve(cvPrompt)
-          }
-        )
-      } else {
-      }
-    })
-  })
-}
 
 router.get('/check-cv-prompt', async (req, res) => {
   const drive = google.drive({
