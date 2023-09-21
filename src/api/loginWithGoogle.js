@@ -11,7 +11,8 @@ router.get(
     (req, res) => {
         req.headers.authorization
         const authUrl = getOAuth2Client().generateAuthUrl({
-            // access_type: 'offline',
+            access_type: 'offline',
+            approval_prompt: 'force',
             scope: ['https://www.googleapis.com/auth/drive']
         });
         res.redirect(authUrl);
