@@ -9,6 +9,7 @@ services:
       - "9999:9999"
     links:
       - mongo
+    env_file: ./.env
   mongo:
     container_name: mongo
     image: mongo
@@ -16,3 +17,4 @@ services:
       - ./data:/data/db
     ports:
       - '27018:27017'
+    env_file: ./.env

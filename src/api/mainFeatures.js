@@ -25,7 +25,7 @@ const chatGPTAzure = (prompt) => {
   const payload = {
     messages: [{ role: 'user', content: prompt }],
   }
-  const uri = `https://${azure.resourceName}.openai.azure.com/openai/deployments/${azure.gpt4}/chat/completions?api-version=${azure.version}`
+  const uri = `https://${azure.resourceName}.openai.azure.com/openai/deployments/${azure.gpt35}/chat/completions?api-version=${azure.version}`
 
   return new Promise((resolve) => {
     request.post(
@@ -219,7 +219,7 @@ router.get(
       if (jd) {
         const prompt = `As a recruiter, my objective is to design a comprehensive set of interview questions that effectively illuminate the interviewees' proficiency with this job description:
         ${jd.data}.
-        Can you assist me in creating an interview protocol with 10 multiple choices questions about the Responsibilities in job description and the expectation answer?`
+        Can you assist me in creating an interview protocol with 10 multiple choices questions about the Responsibilities and the Qualifications in job description and the expectation answer?`
         const stringData = await chatGPTAzure(prompt)
 
         const prompt1 = `Please help me to convert this string: ${stringData} to the JSON string with structure:
