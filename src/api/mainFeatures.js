@@ -20,6 +20,9 @@ const azure = {
   gpt4: "gpt-4",
 };
 
+
+
+
 const chatGPTAzure = (prompt) => {
   prompt = prompt.replace('“', '"')
   const payload = {
