@@ -25,7 +25,7 @@ const chatGPTAzure = (prompt) => {
   const payload = {
     messages: [{ role: 'user', content: prompt }],
   }
-  const uri = `https://${azure.resourceName}.openai.azure.com/openai/deployments/${azure.gpt35}/chat/completions?api-version=${azure.version}`
+  const uri = `https://${azure.resourceName}.openai.azure.com/openai/deployments/${azure.gpt4}/chat/completions?api-version=${azure.version}`
 
   return new Promise((resolve) => {
     request.post(
@@ -188,6 +188,8 @@ router.post(
     try {
       const data = fs.readFileSync(req.file.path)
       const cvText = await convertPdfToText(data)
+      const cvOverview = await overviewCV(cvText)
+      console.log(cvOverview)
       const oauth2Client = getOAuth2Client()
       let token = req.body.token;
       const top = Number(req.body.top) || 3;
@@ -205,8 +207,14 @@ router.post(
         results.push(...await Promise.all(jobDescriptions.splice(0, 5).map(async (jd) => {
           const { id, jobTitle, data } = jd
           const prompt = `
-              I have a job with description: ${data} and title: ${jobTitle}.
-              The candidate CV: ${cvText}.
+              I have a Job Description: 
+              
+              ${data}
+
+              and the candidate CV:
+
+              ${cvOverview}
+
               Please, help me to calculate matching between the CV and JD, the result in percent, just give me only the result's number`
 
           const result = await chatGPTAzure(prompt)
