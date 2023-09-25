@@ -54,6 +54,18 @@ const chatGPTAzure = (prompt) => {
   })
 }
 
+const overviewCV = async (text) => {
+  const prompt = `
+  Please help me to summary this CV:
+  
+  ${text}
+  
+  Please include candidate responsibilities, qualifications, skills and years of experience.`;
+
+  const result = await chatGPTAzure(prompt);
+  return result;
+}
+
 router.post(
   '/generate/job-description',
   verifyToken,
@@ -137,6 +149,7 @@ router.post(
             results.push(...await Promise.all(pdfFiles.splice(0, 5).map(async file => {
               const dataBuffer = await drive.files.get({ fileId: file.id, alt: 'media' }, { responseType: 'arraybuffer' });
               const text = await convertPdfToText(dataBuffer);
+              const cvOverview = await overviewCV(text);
               const prompt = `
               Please assess the suitability of the candidate for the following job role (by percent):
               
@@ -144,7 +157,7 @@ router.post(
               ${jd.data.trim()}
 
               Candidate CV:
-              ${text.trim()}
+              ${cvOverview.trim()}
 
               Just give me only the result's number.
               `
