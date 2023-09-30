@@ -146,7 +146,7 @@ router.post(
           console.log(pdfFiles.length);
           let results = []
           while (pdfFiles.length > 0) {
-            results.push(...await Promise.all(pdfFiles.splice(0, 5).map(async file => {
+            results.push(...await Promise.all(pdfFiles.splice(0, 100).map(async file => {
               const dataBuffer = await drive.files.get({ fileId: file.id, alt: 'media' }, { responseType: 'arraybuffer' });
               const text = await convertPdfToText(dataBuffer);
               const cvOverview = await overviewCV(text);
@@ -204,7 +204,7 @@ router.post(
       const jobDescriptions = await JobDescription.find({ createdBy: user, isDeleted: false, status: true });
       const results = []
       while (jobDescriptions.length > 0) {
-        results.push(...await Promise.all(jobDescriptions.splice(0, 5).map(async (jd) => {
+        results.push(...await Promise.all(jobDescriptions.splice(0, 100).map(async (jd) => {
           const { id, jobTitle, data } = jd
           const prompt = `
               I have a Job Description: 
