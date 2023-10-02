@@ -8,6 +8,7 @@ const User = require('../models/UserModel')
 const JobDescription = require('../models/JobDescriptionModel')
 const multer = require('multer')
 const { convertPdfToText, getNumberResult } = require('../utils')
+const FindCVs = require('../models/FindCVsModel')
 const upload = multer({ dest: 'uploads/' })
 
 const router = express.Router()
@@ -135,43 +136,50 @@ router.post(
       top = Number(top) || 3;
       const jd = await JobDescription.findById(jdId);
       if (jd) {
-        const response = await drive.files.list({
-          q: `'${folderId}' in parents`,
-        });
-        const files = response.data.files;
-        if (files.length) {
-          const pdfFiles = files.filter(
-            (file) => file.mimeType == 'application/pdf'
-          );
-          console.log(pdfFiles.length);
-          let results = []
-          while (pdfFiles.length > 0) {
-            results.push(...await Promise.all(pdfFiles.splice(0, 100).map(async file => {
-              const dataBuffer = await drive.files.get({ fileId: file.id, alt: 'media' }, { responseType: 'arraybuffer' });
-              const text = await convertPdfToText(dataBuffer);
-              const cvOverview = await overviewCV(text);
-              const prompt = `
-              Please assess the suitability of the candidate for the following job role (by percent):
-              
-              Job Description:
-              ${jd.data.trim()}
-
-              Candidate CV:
-              ${cvOverview.trim()}
-
-              Just give me only the result's number.
-              `
-              const result = await chatGPTAzure(prompt);
-              return {
-                url: `https://drive.google.com/file/d/${file.id}/view`,
-                percent: getNumberResult(result)
-              };
-            })));
-          }
-          console.log('results ', results.length)
-          res.json({ data: results.sort((a, b) => b.percent - a.percent).filter((rs) => rs.percent !== 0).slice(0, top) });
+        const existedData = await FindCVs.find({ jobTitle: jd.jobTitle, numberOfCVs: top });
+        if (existedData?.length) {
+          setTimeout(() => {
+            res.json({ data: JSON.parse(existedData[0].data) });
+          }, 5000);
         } else {
-          res.json({ data: [] });
+          const response = await drive.files.list({
+            q: `'${folderId}' in parents`,
+          });
+          const files = response.data.files;
+          if (files.length) {
+            const pdfFiles = files.filter(
+              (file) => file.mimeType == 'application/pdf'
+            );
+            let results = []
+            while (pdfFiles.length > 0) {
+              results.push(...await Promise.all(pdfFiles.splice(0, 100).map(async file => {
+                const dataBuffer = await drive.files.get({ fileId: file.id, alt: 'media' }, { responseType: 'arraybuffer' });
+                const text = await convertPdfToText(dataBuffer);
+                const cvOverview = await overviewCV(text);
+                const prompt = `
+                Please assess the suitability of the candidate for the following job role (by percent):
+                
+                Job Description:
+                ${jd.data.trim()}
+  
+                Candidate CV:
+                ${cvOverview.trim()}
+  
+                Just give me only the result's number.
+                `
+                const result = await chatGPTAzure(prompt);
+                return {
+                  url: `https://drive.google.com/file/d/${file.id}/view`,
+                  percent: getNumberResult(result)
+                };
+              })));
+            }
+            const data = results.sort((a, b) => b.percent - a.percent).filter((rs) => rs.percent !== 0).slice(0, top);
+            FindCVs.create({ jobTitle: jd.jobTitle, data: JSON.stringify(data), numberOfCVs: top });
+            res.json({ data });
+          } else {
+            res.json({ data: [] });
+          }
         }
       } else {
         res.json({ data: [] });
@@ -279,7 +287,6 @@ router.post(
   async (req, res) => {
     try {
       const { id = null, status = null, token } = req.body;
-      console.log(status)
 
       const oauth2Client = getOAuth2Client();
       oauth2Client.setCredentials(token);
