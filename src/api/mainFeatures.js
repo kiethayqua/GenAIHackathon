@@ -47,6 +47,7 @@ const chatGPTAzure = (prompt) => {
           const text = data['choices'][0]['message']['content']
           resolve(text)
         } else {
+          console.log(`Error res: ${JSON.stringify(res)}`)
           resolve('')
         }
       }
@@ -56,11 +57,19 @@ const chatGPTAzure = (prompt) => {
 
 const overviewCV = async (text) => {
   const prompt = `
-  Please help me to summary this CV:
+  We have a resume. We need to sumary that based on the following criteria:
+  1) Experience
+  2) Skills
+  3) Education
+  4) Certifications
+  5) Awards and Achievements
+  6) Soft skills
   
+  This is the resume: 
   ${text}
-  
-  Please include candidate responsibilities, qualifications, skills and years of experience.`;
+
+  Please, return only the sumary following above criterias
+  `;
 
   const result = await chatGPTAzure(prompt);
   return result;
@@ -143,32 +152,78 @@ router.post(
           const pdfFiles = files.filter(
             (file) => file.mimeType == 'application/pdf'
           );
-          console.log(pdfFiles.length);
-          let results = []
-          while (pdfFiles.length > 0) {
-            results.push(...await Promise.all(pdfFiles.splice(0, 100).map(async file => {
-              const dataBuffer = await drive.files.get({ fileId: file.id, alt: 'media' }, { responseType: 'arraybuffer' });
-              const text = await convertPdfToText(dataBuffer);
-              const cvOverview = await overviewCV(text);
-              const prompt = `
-              Please assess the suitability of the candidate for the following job role (by percent):
-              
+          const results = await Promise.all(pdfFiles.map(async file => {
+            const dataBuffer = await drive.files.get({ fileId: file.id, alt: 'media' }, { responseType: 'arraybuffer' });
+            const text = await convertPdfToText(dataBuffer);
+            // const cvOverview = await overviewCV(text);
+            // console.log(cvOverview)
+
+            const promptTest = `
+              We have a job description for a position and a candidate's resume.
+              We need to evaluate how well the candidate's resume matches the job description. 
               Job Description:
               ${jd.data.trim()}
+              
+              Candidate's Resume:
+              ${text.trim()}
+              
+              We will evaluate the match between the resume and job description based on the following criteria: 
+              1) 'Experience' with a weight of 30%: This analyzes whether the candidate's past job roles and experience in the field align with the requirements of the job description.
+              2) 'Skills' with a weight of 50%: This evaluates the correspondence of the candidate's skills to those specified in the job description.
+              3) 'Education' with a weight of 5%: This factors in the candidate's academic qualifications, GPA and how they align with the job's requirements.
+              4) 'Certifications' with a weight of 5%: We will consider any relevant certifications the candidate holds that are specified in the job description.
+              5) 'Awards and Achievements' with a weight of 5%: If the candidate has any awards or achievements that are mentioned in the job description, this will also be factored in.
+              6) 'Soft skills' with a weight of 5%: This evaluates the communication, team work and foreign languages of the candidate.
+              Please calculate how well the candidate's resume matches the job description based on these criteria.
+              Just give me only the overall match score is a number in percent.
+            `;
 
-              Candidate CV:
-              ${cvOverview.trim()}
+            const result = await chatGPTAzure(promptTest);
 
-              Just give me only the result's number.
-              `
-              const result = await chatGPTAzure(prompt);
-              return {
-                url: `https://drive.google.com/file/d/${file.id}/view`,
-                percent: getNumberResult(result)
-              };
-            })));
-          }
-          console.log('results ', results.length)
+            console.log(`The result of ${file.name}: ${result}`)
+            return {
+              url: `https://drive.google.com/file/d/${file.id}/view`,
+              percent: getNumberResult(result)
+            };
+          }))
+
+          // while (pdfFiles.length > 0) {
+          //   results.push(...await Promise.all(pdfFiles.splice(0, 5).map(async file => {
+          //     const dataBuffer = await drive.files.get({ fileId: file.id, alt: 'media' }, { responseType: 'arraybuffer' });
+          //     const text = await convertPdfToText(dataBuffer);
+          //     // const cvOverview = await overviewCV(text);
+          //     // console.log(cvOverview)
+
+          //     const promptTest = `
+          //       We have a job description for a position and a candidate's resume.
+          //       We need to evaluate how well the candidate's resume matches the job description. 
+          //       Job Description:
+          //       ${jd.data.trim()}
+
+          //       Candidate's Resume:
+          //       ${text.trim()}
+
+          //       We will evaluate the match between the resume and job description based on the following criteria: 
+          //       1) 'Experience' with a weight of 30%: This analyzes whether the candidate's past job roles and experience in the field align with the requirements of the job description.
+          //       2) 'Skills' with a weight of 50%: This evaluates the correspondence of the candidate's skills to those specified in the job description.
+          //       3) 'Education' with a weight of 5%: This factors in the candidate's academic qualifications, GPA and how they align with the job's requirements.
+          //       4) 'Certifications' with a weight of 5%: We will consider any relevant certifications the candidate holds that are specified in the job description.
+          //       5) 'Awards and Achievements' with a weight of 5%: If the candidate has any awards or achievements that are mentioned in the job description, this will also be factored in.
+          //       6) 'Soft skills' with a weight of 5%: This evaluates the communication, team work and foreign languages of the candidate.
+          //       Please calculate how well the candidate's resume matches the job description based on these criteria.
+          //       Just give me only the overall match score is a number in percent.
+          //     `;
+
+          //     const result = await chatGPTAzure(promptTest);
+
+          //     console.log(`The result of ${file.name}: ${result}`)
+          //     return {
+          //       url: `https://drive.google.com/file/d/${file.id}/view`,
+          //       percent: getNumberResult(result)
+          //     };
+          //   })
+          //   ));
+          // }
           res.json({ data: results.sort((a, b) => b.percent - a.percent).filter((rs) => rs.percent !== 0).slice(0, top) });
         } else {
           res.json({ data: [] });
