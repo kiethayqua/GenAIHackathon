@@ -131,8 +131,7 @@ router.post(
         version: 'v3',
         auth: oauth2Client,
       });
-      let { folderId, jdId, top } = req.body;
-      top = Number(top) || 3;
+      let { folderId, jdId } = req.body;
       const jd = await JobDescription.findById(jdId);
       if (jd) {
         const response = await drive.files.list({
@@ -146,10 +145,10 @@ router.post(
           console.log(pdfFiles.length);
           let results = []
           while (pdfFiles.length > 0) {
-            results.push(...await Promise.all(pdfFiles.splice(0, 100).map(async file => {
+            results.push(...await Promise.all(pdfFiles.splice(0, 10).map(async file => {
               const dataBuffer = await drive.files.get({ fileId: file.id, alt: 'media' }, { responseType: 'arraybuffer' });
               const text = await convertPdfToText(dataBuffer);
-              const cvOverview = await overviewCV(text);
+              // const cvOverview = await overviewCV(text);
               const prompt = `
               Please assess the suitability of the candidate for the following job role (by percent):
               
@@ -157,7 +156,7 @@ router.post(
               ${jd.data.trim()}
 
               Candidate CV:
-              ${cvOverview.trim()}
+              ${text.trim()}
 
               Just give me only the result's number.
               `
@@ -168,8 +167,7 @@ router.post(
               };
             })));
           }
-          console.log('results ', results.length)
-          res.json({ data: results.sort((a, b) => b.percent - a.percent).filter((rs) => rs.percent !== 0).slice(0, top) });
+          res.json({ data: results.sort((a, b) => b.percent - a.percent).filter((rs) => rs.percent !== 0) });
         } else {
           res.json({ data: [] });
         }
